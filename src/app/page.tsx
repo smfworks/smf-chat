@@ -407,6 +407,9 @@ export default function ChatPage() {
       const data = await res.json();
       if (typeof window !== "undefined") localStorage.setItem("smf-chat-token", data.token);
       setToken(data.token);
+      // Always start fresh from the beginning when logging in
+      setMessages([]);
+      setSince(0);
     } catch {
       setAuthError("Connection error — try again");
     }
@@ -453,10 +456,11 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!token) return;
+    setSince(0);
     loadMessages();
     pollingRef.current = setInterval(loadMessages, 2000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
-  }, [token, loadMessages]);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 

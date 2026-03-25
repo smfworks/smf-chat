@@ -39,11 +39,14 @@ export function verifyPin(pin: string): boolean {
 function decodeEnv(key: string): string {
   const val = process.env[key];
   if (!val) return "";
+  // Auto-detect: try base64 decode first, validate with JSON.parse
+  // If that fails, return raw value (plain bcrypt strings or plain strings)
   try {
-    // Base64-encode values with $ to avoid shell expansion stripping them
-    return Buffer.from(val, "base64").toString("utf8");
+    const decoded = Buffer.from(val, "base64").toString("utf8");
+    JSON.parse(decoded); // validate it's actually JSON
+    return decoded;
   } catch {
-    return val;
+    return val; // return raw value as-is
   }
 }
 
