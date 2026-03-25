@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
-import { verifyAgentToken } from "@/lib/auth";
+import { createClient } from "@libsql/client";
 
-export async function GET(req: Request) {
-  const auth = req.headers.get("authorization") ?? "";
-  const token = auth.replace("Bearer ", "");
+export async function GET() {
+  const url = process.env.TURSO_DATABASE_URL;
+  const token = process.env.TURSO_AUTH_TOKEN;
+  const pin = process.env.PIN_SECRET;
   
-  // Try to verify the agent token directly
-  const agentId = verifyAgentToken(token);
-  
-  return NextResponse.json({
-    token_len: token.length,
-    agent_id_result: agentId,
-    agent_hashes_type: typeof process.env.AGENT_TOKEN_HASHES,
-    agent_hashes_len: (process.env.AGENT_TOKEN_HASHES ?? "MISSING").length,
-    agent_hashes_preview: (process.env.AGENT_TOKEN_HASHES ?? "MISSING").slice(0, 50),
-    pin_secret_set: !!process.env.PIN_SECRET,
-    pin_secret_val: process.env.PIN_SECRET ?? "NOT SET",
-  });
+  try {
+    const client = createClient({ url: url!, authToken: token! });
+    const result = await client.execute("SELECT COUNT(*) as count FROM messages");
+    return NextResponse.json({
+      turso_url: url ?? "NOT SET",
+      turso_token: token ? "SET" : "NOT SET",
+      pin_secret: pin ?? "NOT SET",
+      pin_secret_len: pin?.length ?? 0,
+      db_count: result.rows,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message, url, token_set: !!token, pin_secret: pin ?? "NOT SET" });
+  }
 }

@@ -29,7 +29,7 @@ export async function verifyMichaelToken(token: string): Promise<boolean> {
 }
 
 // ── PIN auth (for Michael web login) ──────────────────────
-const CORRECT_PIN = process.env.PIN_SECRET ?? "123456";
+const CORRECT_PIN = (process.env.PIN_SECRET ?? "123456").trim();
 
 export function verifyPin(pin: string): boolean {
   return pin === CORRECT_PIN;

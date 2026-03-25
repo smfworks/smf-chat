@@ -1,16 +1,13 @@
 /**
- * smf-chat DB — File-based JSON store
- * Works on Vercel serverless (no external DB needed)
- * Uses /tmp for ephemeral storage (resets on cold start)
- * For production persistence, replace with Turso or Postgres
+ * smf-chat — Database layer
+ * Uses Turso (libsql) for persistent storage.
+ * Falls back to in-memory if TURSO_DATABASE_URL is not set.
  */
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
+import { createClient, type Client } from "@libsql/client";
 
-const DATA_FILE = "/tmp/smf-chat-data.json";
-
-type Message = {
+// ── Types ───────────────────────────────────────────────
+export type Message = {
   id: string;
   agentId: string;
   content: string;
@@ -18,86 +15,106 @@ type Message = {
   channel: string;
 };
 
-type AgentRecord = {
-  id: string;
-  name: string;
-  tokenHash: string;
-  emoji: string;
-  lastSeen: number;
-};
+// ── Turso client ───────────────────────────────────────
+let _client: Client | null = null;
 
-type DataStore = {
-  messages: Message[];
-  agents: AgentRecord[];
-};
-
-function loadData(): DataStore {
-  if (existsSync(DATA_FILE)) {
-    try {
-      return JSON.parse(readFileSync(DATA_FILE, "utf-8"));
-    } catch {
-      // corrupt file, reset
-    }
+function getClient(): Client | null {
+  if (!process.env.TURSO_DATABASE_URL) return null;
+  if (!_client) {
+    _client = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
   }
-  return { messages: [], agents: [] };
+  return _client;
 }
 
-function saveData(data: DataStore) {
-  writeFileSync(DATA_FILE, JSON.stringify(data), "utf-8");
+// ── Schema init ────────────────────────────────────────
+export async function initDb(): Promise<void> {
+  const client = getClient();
+  if (!client) return;
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id          TEXT    PRIMARY KEY,
+      agent_id    TEXT    NOT NULL,
+      content     TEXT    NOT NULL,
+      timestamp   INTEGER NOT NULL,
+      channel     TEXT    NOT NULL
+    )
+  `);
+  await client.execute(`
+    CREATE INDEX IF NOT EXISTS idx_messages_channel_timestamp
+      ON messages(channel, timestamp)
+  `);
 }
 
-// ── Messages ──────────────────────────────────────────────
+// ── In-memory fallback store ────────────────────────────
+const _memStore: Message[] = [];
 
-export async function insertMessage(msg: Message) {
-  const data = loadData();
-  data.messages.push(msg);
-  // Keep last 1000 messages per channel to avoid unbounded growth
-  const byChannel: Record<string, Message[]> = {};
-  for (const m of data.messages) {
-    byChannel[m.channel] = byChannel[m.channel] ?? [];
-    byChannel[m.channel].push(m);
-  }
-  for (const ch in byChannel) {
-    byChannel[ch] = byChannel[ch].slice(-1000);
-  }
-  data.messages = Object.values(byChannel).flat();
-  saveData(data);
+function genId(): string {
+  return crypto.randomUUID();
 }
 
-export async function getMessages(channel: string, since = 0): Promise<Message[]> {
-  const data = loadData();
-  return data.messages
-    .filter((m) => m.channel === channel && m.timestamp > since)
-    .sort((a, b) => a.timestamp - b.timestamp);
-}
+// ── API ────────────────────────────────────────────────
 
-// ── Agents ────────────────────────────────────────────────
+/**
+ * Save a message. Returns the saved message with id + timestamp.
+ */
+export async function saveMessage(
+  agentId: string,
+  content: string,
+  channel: string,
+): Promise<Message> {
+  const msg: Message = {
+    id: genId(),
+    agentId,
+    content,
+    timestamp: Date.now(),
+    channel,
+  };
 
-export async function upsertAgent(agent: AgentRecord) {
-  const data = loadData();
-  const idx = data.agents.findIndex((a) => a.id === agent.id);
-  if (idx >= 0) {
-    data.agents[idx] = agent;
+  const client = getClient();
+  if (client) {
+    await client.execute({
+      sql: "INSERT INTO messages (id, agent_id, content, timestamp, channel) VALUES (?, ?, ?, ?, ?)",
+      args: [msg.id, msg.agentId, msg.content, msg.timestamp, msg.channel],
+    });
   } else {
-    data.agents.push(agent);
+    _memStore.push(msg);
   }
-  saveData(data);
+
+  return msg;
 }
 
-export async function getAgentById(id: string): Promise<AgentRecord | null> {
-  const data = loadData();
-  return data.agents.find((a) => a.id === id) ?? null;
-}
+/**
+ * Get messages for a channel newer than `since` (exclusive).
+ * If since is 0, returns all messages up to a limit.
+ */
+export async function getMessages(
+  channel: string,
+  since: number,
+  limit = 500,
+): Promise<Message[]> {
+  const client = getClient();
 
-export async function getAllAgents(): Promise<Omit<AgentRecord, "tokenHash">[]> {
-  const data = loadData();
-  return data.agents
-    .map(({ tokenHash: _, ...rest }) => rest)
-    .sort((a, b) => b.lastSeen - a.lastSeen);
-}
+  if (client) {
+    const result = await client.execute({
+      sql: `
+        SELECT id, agent_id AS agentId, content, timestamp, channel
+        FROM messages
+        WHERE channel = ? AND timestamp > ?
+        ORDER BY timestamp ASC
+        LIMIT ?
+      `,
+      args: [channel, since, limit],
+    });
+    return result.rows as unknown as Message[];
+  }
 
-// ── Init (no-op for file store) ───────────────────────────
-
-export async function initDb() {
-  // No-op — file store auto-creates on first write
+  // In-memory fallback
+  const msgs = _memStore.filter(
+    (m) => m.channel === channel && m.timestamp > since,
+  );
+  return msgs.slice(0, limit);
 }
