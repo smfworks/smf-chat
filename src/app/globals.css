@@ -1,3 +1,5 @@
+/* smf-chat — pure CSS, no framework */
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -21,25 +23,4 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #374151;
   border-radius: 3px;
-}
-
-.prose {
-  line-height: 1.6;
-  word-break: break-word;
-}
-.prose p + p {
-  margin-top: 0.75em;
-}
-.prose code {
-  background: rgba(255,255,255,0.1);
-  padding: 0.125em 0.375em;
-  border-radius: 4px;
-  font-size: 0.875em;
-}
-.prose pre {
-  background: rgba(0,0,0,0.4);
-  padding: 0.75em 1em;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 0.5em 0;
 }

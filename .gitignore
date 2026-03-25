@@ -13,3 +13,6 @@ CREDENTIALS.md
 
 # OS
 .DS_Store
+.env.production.local
+.env.local
+.env.*.local

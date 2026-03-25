@@ -9,11 +9,6 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? "change-me-in-production-min-32-chars!!",
 );
 
-const PIN_HASH = process.env.PIN_HASH ?? ""; // bcrypt hash of 6-digit PIN
-const AGENT_TOKEN_HASHES: Record<string, string> = JSON.parse(
-  process.env.AGENT_TOKEN_HASHES ?? "{}",
-);
-
 // ── Michael (JWT) ──────────────────────────────────────────
 
 export async function mintMichaelToken(): Promise<string> {
@@ -34,17 +29,34 @@ export async function verifyMichaelToken(token: string): Promise<boolean> {
 }
 
 // ── PIN auth (for Michael web login) ──────────────────────
+const CORRECT_PIN = process.env.PIN_SECRET ?? "123456";
 
 export function verifyPin(pin: string): boolean {
-  if (!PIN_HASH) return false;
-  return compareSync(pin, PIN_HASH);
+  return pin === CORRECT_PIN;
 }
 
 // ── Agent bearer tokens ───────────────────────────────────
+function decodeEnv(key: string): string {
+  const val = process.env[key];
+  if (!val) return "";
+  try {
+    // Base64-encode values with $ to avoid shell expansion stripping them
+    return Buffer.from(val, "base64").toString("utf8");
+  } catch {
+    return val;
+  }
+}
 
 export function verifyAgentToken(token: string): string | null {
-  // token is the raw UUID; we hash it and compare
-  for (const [id, hash] of Object.entries(AGENT_TOKEN_HASHES)) {
+  const raw = decodeEnv("AGENT_TOKEN_HASHES");
+  if (!raw) return null;
+  let hashes: Record<string, string>;
+  try {
+    hashes = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  for (const [id, hash] of Object.entries(hashes)) {
     if (compareSync(token, hash)) return id;
   }
   return null;
