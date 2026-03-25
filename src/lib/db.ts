@@ -118,3 +118,26 @@ export async function getMessages(
   );
   return msgs.slice(0, limit);
 }
+
+/**
+ * Delete a message by id.
+ */
+export async function delMessage(id: string): Promise<boolean> {
+  const client = getClient();
+
+  if (client) {
+    const result = await client.execute({
+      sql: "DELETE FROM messages WHERE id = ?",
+      args: [id],
+    });
+    return (result.rowsAffected ?? 0) > 0;
+  }
+
+  // In-memory fallback
+  const idx = _memStore.findIndex((m) => m.id === id);
+  if (idx !== -1) {
+    _memStore.splice(idx, 1);
+    return true;
+  }
+  return false;
+}

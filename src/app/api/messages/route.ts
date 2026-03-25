@@ -45,3 +45,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  await ensureDb();
+  const auth = await verifyBearer(req.headers.get("authorization"));
+  if (!auth.ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+    const { delMessage } = await import("@/lib/db");
+    const deleted = await delMessage(id);
+    return NextResponse.json({ deleted });
+  } catch (e) {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
