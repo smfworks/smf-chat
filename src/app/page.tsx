@@ -491,7 +491,18 @@ export default function ChatPage() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#0e0e10" }}>
-      <Sidebar msgCount={messages.length} onLogout={handleLogout} />
+      {/* Sidebar — sticky, always visible while scrolling */}
+      <div style={{
+        width: 240, flexShrink: 0,
+        position: "sticky", top: 0, height: "100vh",
+        alignSelf: "flex-start",
+        display: "flex", flexDirection: "column",
+        background: "#161618",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
+        zIndex: 10
+      }}>
+        <Sidebar msgCount={messages.length} onLogout={handleLogout} />
+      </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "rgba(14,14,16,0.95)" }}>
         <header style={{
@@ -595,4 +606,3 @@ export default function ChatPage() {
   );
 }
 // deployed-1774460771
-// force-fresh-1774460869
