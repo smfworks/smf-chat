@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@libsql/client";
 import { verifyAgentToken } from "@/lib/auth";
 
@@ -12,11 +12,10 @@ function decodeEnvVal(key: string): string {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const url = process.env.TURSO_DATABASE_URL;
   const token = process.env.TURSO_AUTH_TOKEN;
   const pin = process.env.PIN_SECRET;
-  const action = new URL(req.url).searchParams.get("action");
 
   // Decode AGENT_TOKEN_HASHES using the same method as auth.ts
   const decoded = decodeEnvVal("AGENT_TOKEN_HASHES");
@@ -36,21 +35,6 @@ export async function GET(req: NextRequest) {
 
   try {
     const client = createClient({ url: url!, authToken: token! });
-
-    // One-shot cleanup: delete all NO_REPLY messages
-    if (action === "cleanup-noreply") {
-      const findResult = await client.execute(
-        `SELECT id, agent_id, content, timestamp, channel FROM messages WHERE content = 'NO_REPLY'`
-      );
-      const msgs = findResult.rows as unknown as Array<{ id: string; agent_id: string; content: string; timestamp: number; channel: string }>;
-      let deleted = 0;
-      for (const m of msgs) {
-        const r = await client.execute({ sql: "DELETE FROM messages WHERE id = ?", args: [m.id] });
-        if ((r.rowsAffected ?? 0) > 0) deleted++;
-      }
-      return NextResponse.json({ action: "cleanup-noreply", found: msgs.length, deleted });
-    }
-
     const result = await client.execute("SELECT COUNT(*) as count FROM messages");
     return NextResponse.json({
       pin_secret_len: pin?.length ?? 0,
