@@ -378,9 +378,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [since, setSince] = useState(0);
   const [hydrated, setHydrated] = useState(false);
   const [storedToken, setStoredToken] = useState<string | null>(null);
+  const sinceRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -409,7 +409,7 @@ export default function ChatPage() {
       setToken(data.token);
       // Always start fresh from the beginning when logging in
       setMessages([]);
-      setSince(0);
+      sinceRef.current = 0;
     } catch {
       setAuthError("Connection error — try again");
     }
@@ -419,12 +419,12 @@ export default function ChatPage() {
     if (typeof window !== "undefined") localStorage.removeItem("smf-chat-token");
     setToken(null);
     setMessages([]);
-    setSince(0);
+    sinceRef.current = 0;
   }
 
   const loadMessages = useCallback(async () => {
     if (!token) return;
-    const res = await fetch(`/api/messages?channel=general&since=${since}`, {
+    const res = await fetch(`/api/messages?channel=general&since=${sinceRef.current}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return;
@@ -433,11 +433,11 @@ export default function ChatPage() {
       setMessages((prev) => {
         const ids = new Set(prev.map((m) => m.id));
         const newMsgs = data.messages.filter((m: Message) => !ids.has(m.id));
-        if (newMsgs.length > 0) setSince(data.messages[data.messages.length - 1].timestamp);
+        if (newMsgs.length > 0) sinceRef.current = data.messages[data.messages.length - 1].timestamp;
         return [...prev, ...newMsgs].slice(-500);
       });
     }
-  }, [token, since]);
+  }, [token]);
 
   async function handleSend() {
     if (!input.trim() || !token || sending) return;
@@ -456,7 +456,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!token) return;
-    setSince(0);
+    sinceRef.current = 0;
     loadMessages();
     pollingRef.current = setInterval(loadMessages, 2000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
