@@ -331,7 +331,7 @@ function MessageBubble({ msg, prevMsg }: { msg: Message; prevMsg?: Message }) {
         {!showAvatar && <div style={{ width: 32 }} />}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", maxWidth: "65%" }}>
+      <div className="message-bubble" style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", maxWidth: "65%" }}>
         {(showName || isMe) && (
           <div style={{
             display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
@@ -380,6 +380,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [storedToken, setStoredToken] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const sinceRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -491,26 +492,54 @@ export default function ChatPage() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#0e0e10" }}>
-      {/* Sidebar — sticky, always visible while scrolling */}
-      <div style={{
+      {/* Sidebar — sticky on desktop, overlay on mobile */}
+      <div className={`sidebar ${sidebarOpen ? "sidebar--open" : ""}`} style={{
         width: 240, flexShrink: 0,
         position: "sticky", top: 0, height: "100vh",
         alignSelf: "flex-start",
         display: "flex", flexDirection: "column",
         background: "#161618",
         borderRight: "1px solid rgba(255,255,255,0.06)",
-        zIndex: 10
+        zIndex: 10,
       }}>
+        {/* Mobile overlay backdrop */}
+        {sidebarOpen && (
+          <div
+            style={{
+              position: "fixed", inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              zIndex: -1,
+            }}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
         <Sidebar msgCount={messages.length} onLogout={handleLogout} />
       </div>
 
+      {/* Main content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "rgba(14,14,16,0.95)" }}>
-        <header style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px 24px", flexShrink: 0,
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(14,14,16,0.8)", backdropFilter: "blur(20px)"
-        }}>
+        {/* Mobile header with hamburger */}
+        <header
+          className="chat-header"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "12px 16px", flexShrink: 0,
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            background: "rgba(14,14,16,0.8)", backdropFilter: "blur(20px)",
+          }}
+        >
+          {/* Hamburger — only visible on small screens */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              display: "none", width: 36, height: 36, borderRadius: 10,
+              border: "none", background: "rgba(255,255,255,0.06)",
+              color: "white", fontSize: 18, cursor: "pointer",
+              alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}
+            className="mobile-menu-btn"
+          >☰</button>
+
           <div>
             <div style={{ color: "white", fontWeight: 600, fontSize: 14 }}>general</div>
             <div style={{ color: "#6b7280", fontSize: 12 }}>{Object.values(AGENTS).length} online · {messages.length} messages</div>
@@ -524,7 +553,8 @@ export default function ChatPage() {
           </div>
         </header>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 24px" }}>
+        {/* Message area */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px" }} className="chat-layout">
           {messages.length === 0 && (
             <div style={{
               height: "100%", display: "flex", flexDirection: "column",
@@ -551,7 +581,7 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </div>
 
-        <div style={{
+        <div className="composer-area" style={{
           padding: "16px 24px", flexShrink: 0,
           borderTop: "1px solid rgba(255,255,255,0.06)",
           background: "rgba(14,14,16,0.8)"
