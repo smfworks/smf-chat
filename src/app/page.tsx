@@ -532,7 +532,7 @@ export default function ChatPage() {
           <button
             onClick={() => setSidebarOpen(true)}
             style={{
-              display: "none", width: 36, height: 36, borderRadius: 10,
+              width: 36, height: 36, borderRadius: 10,
               border: "none", background: "rgba(255,255,255,0.06)",
               color: "white", fontSize: 18, cursor: "pointer",
               alignItems: "center", justifyContent: "center", flexShrink: 0,
