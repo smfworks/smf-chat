@@ -26,6 +26,13 @@ body {
 }
 
 /* ── Mobile Responsive ─────────────────────────────── */
+@media (min-width: 769px) {
+  /* Hide hamburger on desktop */
+  .mobile-menu-btn {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   /* Show hamburger menu button on mobile */
   .mobile-menu-btn {
